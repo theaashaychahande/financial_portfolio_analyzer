@@ -2,6 +2,16 @@
 
 A comprehensive financial portfolio analysis tool built with Python and Streamlit that provides investment recommendations and portfolio optimization.
 
+financial-portfolio-analyzer/
+│
+├── app.py                 # Main Streamlit application
+├── portfolio_analyzer.py  # Core financial analysis logic
+├── config.ini            # Configuration file
+├── requirements.txt      # Python dependencies
+├── risk_profiles.json    # Risk profile definitions (auto-generated)
+├── portfolio_data.db     # SQLite database (auto-generated)
+└── README.md            # Project documentation
+
 ## Features
 
 - **Portfolio Management**: Create portfolios and track holdings
