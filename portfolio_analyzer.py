@@ -413,3 +413,102 @@ class FinancialPortfolioAnalyzer:
                 'priority': 'Medium'
             })
        
+ 
+     
+        cash_symbols = [h for h in portfolio['holdings'] if h['symbol'] in ['CASH', 'USD']]
+        cash_value = sum(h['current_value'] for h in cash_symbols)
+        cash_percent = cash_value / total_value if total_value > 0 else 0
+        
+        target_cash = target_allocation.get('cash', 5) / 100
+        if cash_percent < target_cash - 0.05: 
+            recommendations.append({
+                'type': 'Liquidity',
+                'message': f'Increase cash position to {target_allocation["cash"]}% of portfolio for opportunities and safety.',
+                'priority': 'Medium'
+            })
+        elif cash_percent > target_cash + 0.05:  
+            recommendations.append({
+                'type': 'Deployment',
+                'message': f'Consider deploying excess cash into investments to meet target allocation.',
+                'priority': 'Medium'
+            })
+        
+        return recommendations
+    
+    def optimize_portfolio(self, portfolio: Dict, risk_profile: str) -> Dict:
+        """Optimize portfolio allocation using modern portfolio theory (simplified)"""
+        target_allocation = self.risk_profiles.get(risk_profile, self.risk_profiles['moderate'])
+        
+       
+        total_value = portfolio['total_value']
+        if total_value == 0:
+            return {}
+        
+       
+        optimized = {
+            'stocks': 0,
+            'bonds': 0,
+            'cash': 0,
+            'other': 0
+        }
+        
+       
+        stock_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'JNJ', 'XOM', 'WMT', 'V', 'PG', 'DIS']
+        bond_symbols = ['BND', 'AGG', 'TLT', 'IEF']
+        
+        for holding in portfolio['holdings']:
+            if holding['symbol'] in stock_symbols:
+                optimized['stocks'] += holding['current_value']
+            elif holding['symbol'] in bond_symbols:
+                optimized['bonds'] += holding['current_value']
+            elif holding['symbol'] in ['CASH', 'USD']:
+                optimized['cash'] += holding['current_value']
+            else:
+                optimized['other'] += holding['current_value']
+        
+        
+        for key in optimized:
+            optimized[key] = optimized[key] / total_value * 100
+        
+      
+        adjustments = {}
+        adjustments['stocks'] = target_allocation['stocks'] - optimized['stocks']
+        adjustments['bonds'] = target_allocation['bonds'] - optimized['bonds']
+        adjustments['cash'] = target_allocation['cash'] - optimized['cash']
+        
+        return {
+            'current': optimized,
+            'target': target_allocation,
+            'adjustments': adjustments
+        }
+
+if __name__ == "__main__":
+    analyzer = FinancialPortfolioAnalyzer()
+    
+   
+    user_id = analyzer.create_user("test_user", "password123", "moderate")
+    portfolio_id = analyzer.create_portfolio(user_id, "Test Portfolio")
+    
+    
+    analyzer.add_holding(portfolio_id, "AAPL", 10, 150.0, "2023-01-15")
+    analyzer.add_holding(portfolio_id, "MSFT", 5, 250.0, "2023-02-20")
+    analyzer.add_holding(portfolio_id, "CASH", 1000, 1.0, "2023-03-01")
+   
+    symbols = ["AAPL", "MSFT"]
+    asyncio.run(analyzer.fetch_market_data(symbols))
+    
+    
+    portfolio = analyzer.get_portfolio(portfolio_id)
+    print("Portfolio:", json.dumps(portfolio, indent=2))
+    
+  
+    metrics = analyzer.calculate_portfolio_metrics(portfolio)
+    print("Metrics:", json.dumps(metrics, indent=2))
+    
+   
+    recommendations = analyzer.generate_recommendations(portfolio, "moderate")
+    print("Recommendations:", json.dumps(recommendations, indent=2))
+    
+ 
+    optimization = analyzer.optimize_portfolio(portfolio, "moderate")
+    print("Optimization:", json.dumps(optimization, indent=2))
