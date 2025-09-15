@@ -93,6 +93,15 @@ The application demonstrates the use of multiple Python libraries including:
 - Web: urllib, webbrowser
 - Concurrency: asyncio, threading
 
+## Demo Instructions
+
+1. The app will auto-create sample data on first run
+2. Use these demo credentials:
+   - Username: `test_user`
+   - Password: `password123`
+3. Or create a new account with any credentials
+4. The portfolio will already have sample holdings (AAPL, MSFT)
+   
 ## License
 
 This project is for educational purposes. Please ensure compliance with Alpha Vantage's terms of service when using their API.
