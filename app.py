@@ -184,4 +184,141 @@ if page == "Dashboard":
                         st.markdown(f"**Risk Level**: <span style='color:{risk_color}'>{metrics['risk_level']}</span>", 
                                    unsafe_allow_html=True)
                 
-             
+            
+                if 'sector_allocation' in metrics and metrics['sector_allocation']:
+                    st.subheader("Sector Allocation")
+                    sector_df = pd.DataFrame(
+                        list(metrics['sector_allocation'].items()), 
+                        columns=['Sector', 'Value']
+                    )
+                    sector_df['Percentage'] = (sector_df['Value'] / portfolio['total_value'] * 100).round(2)
+                    
+                    fig = px.pie(
+                        sector_df, 
+                        values='Value', 
+                        names='Sector',
+                        title='Portfolio by Sector'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        else:
+            st.info("This portfolio is empty. Add some holdings in the Portfolio Management section.")
+
+elif page == "Portfolio Management":
+    st.title("Portfolio Management")
+    
+    tab1, tab2, tab3 = st.tabs(["Create Portfolio", "Add Holdings", "View Portfolios"])
+    
+    with tab1:
+        st.subheader("Create New Portfolio")
+        with st.form("create_portfolio"):
+            portfolio_name = st.text_input("Portfolio Name")
+            create_btn = st.form_submit_button("Create Portfolio")
+            
+            if create_btn and portfolio_name:
+                portfolio_id = analyzer.create_portfolio(st.session_state.user_id, portfolio_name)
+                st.success(f"Portfolio '{portfolio_name}' created successfully!")
+        
+                st.cache_data.clear()
+    
+    with tab2:
+        st.subheader("Add Holdings to Portfolio")
+        
+        if portfolios_df.empty:
+            st.warning("You need to create a portfolio first.")
+        else:
+            selected_portfolio = st.selectbox(
+                "Select Portfolio",
+                options=portfolios_df['id'].tolist(),
+                format_func=lambda x: portfolios_df[portfolios_df['id'] == x]['name'].iloc[0],
+                key="add_holding"
+            )
+            
+            with st.form("add_holding_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    symbol = st.text_input("Symbol (e.g., AAPL, MSFT)", value="AAPL").upper()
+                    quantity = st.number_input("Quantity", min_value=0.0, value=10.0, step=1.0)
+                
+                with col2:
+                    purchase_price = st.number_input("Purchase Price", min_value=0.0, value=150.0, step=0.01)
+                    purchase_date = st.date_input("Purchase Date", value=datetime.now() - timedelta(days=30))
+                
+                add_btn = st.form_submit_button("Add Holding")
+                
+                if add_btn:
+                    analyzer.add_holding(
+                        selected_portfolio, symbol, quantity, 
+                        purchase_price, purchase_date.strftime("%Y-%m-%d")
+                    )
+                    st.success(f"Added {quantity} shares of {symbol} to portfolio")
+                   
+                    asyncio.run(analyzer.fetch_market_data([symbol]))
+    
+    with tab3:
+        st.subheader("Your Portfolios")
+        
+        if portfolios_df.empty:
+            st.info("You don't have any portfolios yet.")
+        else:
+            for _, row in portfolios_df.iterrows():
+                with st.expander(row['name']):
+                    portfolio = analyzer.get_portfolio(row['id'])
+                    
+                    if portfolio and portfolio['holdings']:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Total Value:** ${portfolio['total_value']:,.2f}")
+                            st.write(f"**Total Gain/Loss:** ${portfolio['total_gain']:,.2f} "
+                                    f"({portfolio['total_gain_percent']:.2f}%)")
+                        
+                        with col2:
+                            st.write(f"**Number of Holdings:** {len(portfolio['holdings'])}")
+                        
+                   
+                        holdings_df = pd.DataFrame(portfolio['holdings'])
+                        holdings_df = holdings_df[['symbol', 'quantity', 'current_price', 'current_value']]
+                        holdings_df.columns = ['Symbol', 'Quantity', 'Price', 'Value']
+                        st.dataframe(holdings_df, use_container_width=True)
+                    else:
+                        st.info("This portfolio is empty.")
+
+elif page == "Market Analysis":
+    st.title("Market Analysis")
+    
+
+    popular_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'NVDA']
+    
+    selected_stocks = st.multiselect(
+        "Select stocks to analyze",
+        options=popular_stocks,
+        default=['AAPL', 'MSFT', 'GOOGL']
+    )
+    
+    if selected_stocks:
+     
+        market_data = asyncio.run(analyzer.fetch_market_data(selected_stocks))
+        
+        if market_data:
+          
+            st.subheader("Current Quotes")
+            
+            quotes_data = []
+            for symbol, data in market_data.items():
+                quotes_data.append({
+                    'Symbol': symbol,
+                    'Price': data.get('price', 0),
+                    'Change': data.get('change', 0),
+                    'Change %': data.get('change_percent', '0%'),
+                    'Volume': data.get('volume', 0)
+                })
+            
+            quotes_df = pd.DataFrame(quotes_data)
+            st.dataframe(quotes_df, use_container_width=True)
+            
+           
+            st.subheader("Price Comparison")
+            
+          
