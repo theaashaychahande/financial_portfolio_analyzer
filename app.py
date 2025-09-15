@@ -103,3 +103,85 @@ if st.session_state.user_id is None:
     
     st.stop()
 
+st.sidebar.write(f"Logged in as: {st.session_state.username}")
+if st.sidebar.button("Logout"):
+    st.session_state.user_id = None
+    st.rerun()
+
+
+@st.cache_data
+def get_user_portfolios(user_id):
+    with analyzer.db_path.connect() as conn:
+        df = pd.read_sql("SELECT id, name FROM portfolios WHERE user_id = ?", conn, params=(user_id,))
+    return df
+
+portfolios_df = get_user_portfolios(st.session_state.user_id)
+
+if page == "Dashboard":
+    st.markdown('<h1 class="main-header">Financial Portfolio Analyzer</h1>', unsafe_allow_html=True)
+    
+    if portfolios_df.empty:
+        st.warning("You don't have any portfolios yet. Create one in the Portfolio Management section.")
+    else:
+        selected_portfolio = st.selectbox(
+            "Select Portfolio",
+            options=portfolios_df['id'].tolist(),
+            format_func=lambda x: portfolios_df[portfolios_df['id'] == x]['name'].iloc[0]
+        )
+        
+        portfolio = analyzer.get_portfolio(selected_portfolio)
+        
+        if portfolio and portfolio['holdings']:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Value", f"${portfolio['total_value']:,.2f}")
+            with col2:
+                st.metric("Total Cost", f"${portfolio['total_cost']:,.2f}")
+            with col3:
+                gain_class = "positive-change" if portfolio['total_gain'] >= 0 else "negative-change"
+                st.metric("Total Gain/Loss", f"${portfolio['total_gain']:,.2f}", 
+                         delta=f"{portfolio['total_gain_percent']:.2f}%")
+            with col4:
+                st.metric("Number of Holdings", len(portfolio['holdings']))
+            
+     
+            st.subheader("Holdings")
+            holdings_df = pd.DataFrame(portfolio['holdings'])
+            if not holdings_df.empty:
+                holdings_df = holdings_df[[
+                    'symbol', 'quantity', 'purchase_price', 'current_price',
+                    'current_value', 'gain', 'gain_percent'
+                ]]
+                holdings_df.columns = ['Symbol', 'Quantity', 'Purchase Price', 'Current Price', 
+                                      'Current Value', 'Gain/Loss', 'Gain/Loss %']
+                holdings_df['Gain/Loss %'] = holdings_df['Gain/Loss %'].round(2)
+                
+             
+                for col in ['Purchase Price', 'Current Price', 'Current Value', 'Gain/Loss']:
+                    holdings_df[col] = holdings_df[col].apply(lambda x: f"${x:,.2f}")
+                
+                st.dataframe(holdings_df, use_container_width=True)
+            
+        
+            metrics = analyzer.calculate_portfolio_metrics(portfolio)
+            if metrics:
+                st.subheader("Portfolio Metrics")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if 'avg_return' in metrics:
+                        st.metric("Average Return", f"{metrics['avg_return']*100:.2f}%")
+                    if 'volatility' in metrics:
+                        st.metric("Volatility", f"{metrics['volatility']*100:.2f}%")
+                    if 'sharpe_ratio' in metrics:
+                        st.metric("Sharpe Ratio", f"{metrics['sharpe_ratio']:.2f}")
+                
+                with col2:
+                    if 'risk_level' in metrics:
+                        risk_color = "red" if metrics['risk_level'] == 'High' else "orange" if metrics['risk_level'] == 'Medium' else "green"
+                        st.markdown(f"**Risk Level**: <span style='color:{risk_color}'>{metrics['risk_level']}</span>", 
+                                   unsafe_allow_html=True)
+                
+             
