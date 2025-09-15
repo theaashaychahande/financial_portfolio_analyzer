@@ -322,3 +322,133 @@ elif page == "Market Analysis":
             st.subheader("Price Comparison")
             
           
+            dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
+            price_data = []
+            
+            for symbol in selected_stocks:
+                base_price = market_data[symbol]['price'] if symbol in market_data else 100
+                
+                prices = [base_price * (1 + np.random.normal(0, 0.02)) for _ in range(30)]
+              
+                prices = np.abs(prices)
+                trend = np.linspace(0, 0.1, 30)
+                prices = prices * (1 + trend)
+                
+                for i, date in enumerate(dates):
+                    price_data.append({
+                        'Date': date,
+                        'Symbol': symbol,
+                        'Price': prices[i]
+                    })
+            
+            price_df = pd.DataFrame(price_data)
+            
+            fig = px.line(
+                price_df, 
+                x='Date', 
+                y='Price', 
+                color='Symbol',
+                title='Historical Price Trends (Simulated)'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+         
+            st.subheader("Volatility Analysis")
+            
+            vol_df = price_df.copy()
+            vol_df['Daily Return'] = vol_df.groupby('Symbol')['Price'].pct_change()
+            vol_df = vol_df.dropna()
+            
+            vol_summary = vol_df.groupby('Symbol')['Daily Return'].agg(['mean', 'std']).reset_index()
+            vol_summary['Volatility (Annualized)'] = vol_summary['std'] * np.sqrt(252)  # Annualize
+            
+            fig = px.bar(
+                vol_summary, 
+                x='Symbol', 
+                y='Volatility (Annualized)',
+                title='Annualized Volatility by Stock'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+elif page == "Recommendations":
+    st.title("Investment Recommendations")
+    
+    if portfolios_df.empty:
+        st.warning("You need to create a portfolio first to get recommendations.")
+    else:
+        selected_portfolio = st.selectbox(
+            "Select Portfolio",
+            options=portfolios_df['id'].tolist(),
+            format_func=lambda x: portfolios_df[portfolios_df['id'] == x]['name'].iloc[0],
+            key="rec_portfolio"
+        )
+        
+        portfolio = analyzer.get_portfolio(selected_portfolio)
+        
+        if portfolio and portfolio['holdings']:
+        
+            with analyzer.db_path.connect() as conn:
+                risk_profile = pd.read_sql(
+                    "SELECT risk_profile FROM users WHERE id = ?", 
+                    conn, params=(st.session_state.user_id,)
+                ).iloc[0]['risk_profile']
+            
+            st.write(f"Your risk profile: **{risk_profile}**")
+            st.write(analyzer.risk_profiles[risk_profile]['description'])
+            
+        
+            recommendations = analyzer.generate_recommendations(portfolio, risk_profile)
+            
+            if recommendations:
+                st.subheader("Personalized Recommendations")
+                
+                for rec in recommendations:
+                    priority_color = {
+                        'High': 'red',
+                        'Medium': 'orange',
+                        'Low': 'green'
+                    }.get(rec['priority'], 'black')
+                    
+                    st.markdown(
+                        f"**{rec['type']}** - <span style='color:{priority_color}'>{rec['priority']} Priority</span>",
+                        unsafe_allow_html=True
+                    )
+                    st.write(rec['message'])
+                    st.divider()
+            else:
+                st.info("No specific recommendations at this time. Your portfolio looks well-balanced!")
+            
+         
+            st.subheader("Portfolio Optimization")
+            optimization = analyzer.optimize_portfolio(portfolio, risk_profile)
+            
+            if optimization:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Current Allocation**")
+                    for asset, percent in optimization['current'].items():
+                        if percent > 0:
+                            st.write(f"{asset.capitalize()}: {percent:.1f}%")
+                
+                with col2:
+                    st.write("**Target Allocation**")
+                    for asset, percent in optimization['target'].items():
+                        st.write(f"{asset.capitalize()}: {percent}%")
+                
+              
+                st.write("**Recommended Adjustments**")
+                for asset, adjustment in optimization['adjustments'].items():
+                    if abs(adjustment) > 1:  # Only show adjustments > 1%
+                        action = "Increase" if adjustment > 0 else "Reduce"
+                        st.write(f"{action} {asset} by {abs(adjustment):.1f}%")
+        else:
+            st.info("Add some holdings to your portfolio to get personalized recommendations.")
+
+
+st.sidebar.markdown("---")
+st.sidebar.info(
+    "This is a demonstration application for financial portfolio analysis. "
+    "Not intended for actual investment advice."
+)
+
