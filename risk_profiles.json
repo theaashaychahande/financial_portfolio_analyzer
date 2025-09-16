@@ -1,0 +1,20 @@
+{
+    "conservative": {
+        "stocks": 40,
+        "bonds": 50,
+        "cash": 10,
+        "description": "Low risk, income-focused portfolio"
+    },
+    "moderate": {
+        "stocks": 60,
+        "bonds": 35,
+        "cash": 5,
+        "description": "Balanced growth and income portfolio"
+    },
+    "aggressive": {
+        "stocks": 80,
+        "bonds": 15,
+        "cash": 5,
+        "description": "High growth potential with higher risk"
+    }
+}
